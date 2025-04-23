@@ -475,6 +475,8 @@ class MovkAnalyzer(object):
         cur_func_start = cur_func.start_ea
 
         insn = idautils.DecodeInstruction(addr)
+        if insn is None:
+            return (None, None)
         mnem = insn.get_canon_mnem()
         if mnem != 'MOVK' or insn.Op2.specval != 48:
             return (None, None)
@@ -524,7 +526,8 @@ class MovkAnalyzer(object):
                     ctx_reg = insn.Op2.reg
                 elif mnem == 'ADD':
                     ctx_reg = insn.Op2.reg
-                    if insn.Op3.type == idaapi.o_idpspec0:
+                    # For old IDAs it is o_idpspec0, for IDA 9.0+ it is o_reg
+                    if insn.Op3.type in [idaapi.o_reg, idaapi.o_idpspec0]:
                         indirect_reg = insn.Op3.reg
                         sliding_ea = insn.ea
                         while sliding_ea >= cur_func_start:
@@ -746,11 +749,18 @@ class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
         icon = 151
 
         def activate(self, ctx):
-            self.plugin.choose_window_here()
-            return 1
+            if idaapi.get_widget_type(ctx.widget) == idaapi.BWN_PSEUDOCODE:
+                self.plugin.choose_by_ea(ctx.cur_func.start_ea)
+            else:
+                self.plugin.choose_window_here()
+            return 0
 
         def update(self, ctx):
-            return idaapi.AST_ENABLE if self.plugin.can_find_xrefs_here() else idaapi.AST_DISABLE
+            if idaapi.get_widget_type(ctx.widget) == idaapi.BWN_PSEUDOCODE:
+                ea = ctx.cur_func.start_ea 
+            else:
+                ea = ctx.cur_ea
+            return idaapi.AST_ENABLE if self.plugin.can_find_xrefs(ea) else idaapi.AST_DISABLE
 
     def __init__(self):
         self.analysis_done = False
@@ -806,7 +816,8 @@ class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
         """
         if not self.analysis_done:
             return
-        if idaapi.get_widget_type(widget) == idaapi.BWN_DISASM and self.can_find_xrefs_here():
+        if idaapi.get_widget_type(widget) == idaapi.BWN_DISASM and self.can_find_xrefs_here() or \
+            idaapi.get_widget_type(widget) == idaapi.BWN_PSEUDOCODE and self.can_find_xrefs(get_func_start(idc.here())):
             idaapi.attach_action_to_popup(widget, popup_handle, "-", None, idaapi.SETMENU_FIRST)
             idaapi.attach_action_to_popup(widget, popup_handle, self.jump_xref_menu.get_name(), None,
                                           idaapi.SETMENU_FIRST)
@@ -921,9 +932,12 @@ class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
         self.choose_by_ea(idc.here())
 
     def can_find_xrefs_here(self):
+        return self.can_find_xrefs(idc.here())
+
+    def can_find_xrefs(self, ea):
         if not self.analysis_done:
             return False
-        return self.pick_choose_func_for_ea(idc.here()) is not None
+        return self.pick_choose_func_for_ea(ea) is not None
 
     def choose_file_for_patches(self):
         file_path = idaapi.get_input_file_path()
@@ -935,6 +949,12 @@ class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
                         self.wanted_name)
             name = idaapi.ask_file(False, '*', 'locate the input binary')
             return name or None
+        
+def get_func_start(ea):
+    func = idaapi.get_func(ea)
+    if func is None:
+        return -1
+    return func.start_ea
 
 
 def PLUGIN_ENTRY():
