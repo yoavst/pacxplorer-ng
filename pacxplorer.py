@@ -21,6 +21,8 @@ import idc
 import idautils
 from netnode import Netnode
 from idaapi import Choose
+import ida_kernwin
+import ida_hexrays
 from collections import namedtuple
 from functools import wraps, partial
 import os
@@ -502,6 +504,8 @@ class MovkAnalyzer(object):
             visited.add(curr)
 
             insn = idautils.DecodeInstruction(curr)
+            if insn is None:
+                break
             mnem = insn.get_canon_mnem()
             line = idc.GetDisasm(insn.ea)
             line = line.split(';')[0]  # line comments get into the dissasembly
@@ -750,14 +754,16 @@ class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
 
         def activate(self, ctx):
             if idaapi.get_widget_type(ctx.widget) == idaapi.BWN_PSEUDOCODE:
-                self.plugin.choose_by_ea(ctx.cur_func.start_ea)
+                self.plugin.choose_by_ea(
+                    get_movk_ea_from_current_decompile() or idc.here()
+                )
             else:
                 self.plugin.choose_window_here()
             return 0
 
         def update(self, ctx):
             if idaapi.get_widget_type(ctx.widget) == idaapi.BWN_PSEUDOCODE:
-                ea = ctx.cur_func.start_ea 
+                ea = get_movk_ea_from_current_decompile() or idc.here()
             else:
                 ea = ctx.cur_ea
             return idaapi.AST_ENABLE if self.plugin.can_find_xrefs(ea) else idaapi.AST_DISABLE
@@ -816,11 +822,22 @@ class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
         """
         if not self.analysis_done:
             return
-        if idaapi.get_widget_type(widget) == idaapi.BWN_DISASM and self.can_find_xrefs_here() or \
-            idaapi.get_widget_type(widget) == idaapi.BWN_PSEUDOCODE and self.can_find_xrefs(get_func_start(idc.here())):
-            idaapi.attach_action_to_popup(widget, popup_handle, "-", None, idaapi.SETMENU_FIRST)
-            idaapi.attach_action_to_popup(widget, popup_handle, self.jump_xref_menu.get_name(), None,
-                                          idaapi.SETMENU_FIRST)
+        if (
+            idaapi.get_widget_type(widget) == idaapi.BWN_DISASM
+            and self.can_find_xrefs_here()
+            or idaapi.get_widget_type(widget) == idaapi.BWN_PSEUDOCODE
+            and self.can_find_xrefs(get_movk_ea_from_current_decompile() or idc.here())
+        ):
+            idaapi.attach_action_to_popup(
+                widget, popup_handle, "-", None, idaapi.SETMENU_FIRST
+            )
+            idaapi.attach_action_to_popup(
+                widget,
+                popup_handle,
+                self.jump_xref_menu.get_name(),
+                None,
+                idaapi.SETMENU_FIRST,
+            )
 
     def analyze(self, only_cached=False):
         cache = PickleNetNode(NETNODE)
@@ -955,6 +972,69 @@ def get_func_start(ea):
     if func is None:
         return -1
     return func.start_ea
+
+
+def get_movk_ea_from_current_decompile():
+    w = ida_kernwin.get_current_widget()
+    if ida_kernwin.get_widget_type(w) != ida_kernwin.BWN_PSEUDOCODE:
+        return None
+
+    vu = ida_hexrays.get_widget_vdui(w)
+    if vu is None:
+        return None
+
+    if not vu.get_current_item(ida_hexrays.USE_KEYBOARD):
+        return None
+
+    cfunc = vu.cfunc
+    if cfunc is None:
+        return None
+
+    if vu.item.citype in [ida_hexrays.VDI_FUNC, ida_hexrays.VDI_LVAR]:
+        return cfunc.entry_ea
+
+    if not vu.get_current_item(ida_hexrays.USE_KEYBOARD) or not vu.item.is_citem():
+        return None
+
+    citem = vu.item.e
+    if citem is None or cfunc is None:
+        return None
+
+    cfunc_body = cfunc.body
+    while citem is not None:
+        citem = citem.cexpr if citem.is_expr() else citem.cinsn
+        if citem.op == ida_hexrays.cot_call:
+            movk_ea = get_previous_movk(citem.ea)
+            if movk_ea is not None:
+                return movk_ea
+            break
+        citem = cfunc_body.find_parent_of(citem)
+    return None
+
+
+def get_previous_movk(call_ea: int) -> int | None:
+    """Given a call, search previous instructions to find a movk call"""
+    insn = idautils.DecodeInstruction(call_ea)
+    if not insn:
+        return None
+
+    if insn.get_canon_mnem() != "BLR":
+        return None
+
+    # Get the register for PAC code
+    movk_reg = insn[1].reg
+    # BLR with just one register is unauthenticated, so there will be no PAC xref
+    if movk_reg == 0:
+        return None
+
+    for _ in range(10):
+        insn, _ = idautils.DecodePrecedingInstruction(insn.ea)
+        # No more instructions in this execution flow
+        if insn is None:
+            break
+        if insn.get_canon_mnem() == "MOVK" and insn[0].reg == movk_reg:
+            return insn.ea
+    return None
 
 
 def PLUGIN_ENTRY():
