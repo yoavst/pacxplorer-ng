@@ -15,6 +15,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import print_function
+import json
 import mmap
 import idaapi
 import idc
@@ -45,6 +46,9 @@ else:
     iteritems = dict.iteritems
 
 NETNODE = "$ pacxplorer"
+NETNODE_IO = "$ pacxplorer_io"
+NETNODE_RESULT_INPUT = "input"
+NETNODE_RESULT_OUTPUT = "output"
 
 DEBUG_VTABLE_SIZES = False
 FORCE_ORIG_BYTES_FROM_INPUT_FILE = False
@@ -691,6 +695,8 @@ class FuncXrefChooser(_Choose):
             [ ["Address", 30 | Choose.CHCOL_PLAIN], ["Address (Hex)", 20 | Choose.CHCOL_HEX],
               ["PAC Code", 20 | Choose.CHCOL_PLAIN] ])
 
+ARG_PAC_CANDIDATES_FROM_MOVK = 5
+ARG_PAC_XREFS_TO_ADDRESS = 6
 
 class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
     plugin_initialized = False
@@ -775,6 +781,7 @@ class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
         self.ui_hook = False
         self.analyze_menu = None
         self.jump_xref_menu = None
+        self.input_output_netnode = None
 
     def init(self):
         """plugin_t init() function"""
@@ -788,6 +795,7 @@ class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
         if not PacxplorerPlugin.plugin_initialized:
             self.analyze_menu = self.AnalyzeMenu(self)
             self.jump_xref_menu = self.JumpXrefMenu(self)
+            self.input_output_netnode = Netnode(NETNODE_IO)
 
             self.ui_hook = True
             self.hook()
@@ -797,7 +805,34 @@ class PacxplorerPlugin(idaapi.plugin_t, idaapi.UI_Hooks):
 
     def run(self, arg=0):
         """plugin_t run() implementation"""
-        return
+        if arg in [ARG_PAC_CANDIDATES_FROM_MOVK, ARG_PAC_XREFS_TO_ADDRESS]:
+            input_ea = self.input_output_netnode.get(NETNODE_RESULT_INPUT)
+            self.input_output_netnode.kill()
+            if input_ea is None:
+                print("%s call %d: did not receive argument for" % (self.wanted_name, arg))
+                return
+            elif not self.analysis_done:
+                print("%s call %d: Analysis was not done" % (self.wanted_name, arg))
+                return
+            
+            if arg == ARG_PAC_CANDIDATES_FROM_MOVK:
+                pac_tuple = self.movk_analyzer.pac_tuple_from_ea(input_ea)
+                if not pac_tuple:
+                    print("%s call %d: Could not find pac tuple for ea %x" % (self.wanted_name, arg, input_ea))
+                    return
+
+                candidates = self.vtable_analyzer.func_from_pac_tuple(pac_tuple)
+                result_serialized = json.dumps([candidate._asdict() for candidate in candidates])
+                self.input_output_netnode[NETNODE_RESULT_OUTPUT] = result_serialized
+            else:
+                pac_codes = self.vtable_analyzer.codes_from_func_addr(input_ea)
+                if not pac_codes:
+                    print("%s call %d: Failed to fund pac code for ea %x" % (self.wanted_name, arg, input_ea))
+                    return
+                
+                movks = self.movk_analyzer.movks_from_pac_codes(pac_codes)
+                result_serialized = json.dumps([[addr, code] for addr,code in movks])
+                self.input_output_netnode[NETNODE_RESULT_OUTPUT] = result_serialized
 
     def term(self):
         """plugin_t term() implementation"""
