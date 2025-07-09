@@ -592,6 +592,9 @@ class MovkAnalyzer(object):
 
 
 class _Choose(Choose):
+    # in order to restore the last index of the marker on reopen
+    _markers_idx = {}
+
     # Fix Choose.UI_Hooks_Trampoline to work with modal dialogs
     class UI_Hooks_Trampoline(Choose.UI_Hooks_Trampoline):
         def populating_widget_popup(self, form, popup_handle):
@@ -615,11 +618,14 @@ class _Choose(Choose):
                 else idaapi.AST_DISABLE_FOR_WIDGET
 
     def __init__(self, title, items, columns):
+        self._title = title
+
         Choose.__init__(
             self,
             title,
             columns,
-            flags=Choose.CH_RESTORE)
+            flags=Choose.CH_RESTORE,
+            deflt=_Choose._markers_idx.get(title, 0))
 
         self.items = items
 
@@ -628,6 +634,9 @@ class _Choose(Choose):
 
     def OnGetLine(self, n):
         return self.items[n]
+    
+    def OnSelectionChange(self, sel):
+        _Choose._markers_idx[self._title] = sel        
 
     def show(self):
         selected = self.Show(modal=True)
@@ -1008,6 +1017,23 @@ def get_func_start(ea):
         return -1
     return func.start_ea
 
+def find_call_from_ea(cfunc, item_ea):
+    insn = idautils.DecodeInstruction(item_ea)
+    while insn is not None and insn.get_canon_mnem() not in ("BLR", "BR"):
+        next_ea = idc.next_head(item_ea)
+        # Wer'e not in the same statement anymore..
+        if (
+            next_ea not in cfunc.eamap
+            or item_ea not in cfunc.eamap
+            or cfunc.eamap[item_ea] != cfunc.eamap[next_ea]
+        ):
+            return None
+        item_ea = next_ea
+        insn = idautils.DecodeInstruction(item_ea)
+    if insn is None:
+        print(f"Got none for ea {item_ea=}")
+        return None
+    return item_ea
 
 def get_movk_ea_from_current_decompile():
     w = ida_kernwin.get_current_widget()
@@ -1036,13 +1062,19 @@ def get_movk_ea_from_current_decompile():
         return None
 
     cfunc_body = cfunc.body
+    has_seen_call = False
     while citem is not None:
         citem = citem.cexpr if citem.is_expr() else citem.cinsn
         if citem.op == ida_hexrays.cot_call:
-            movk_ea = get_previous_movk(citem.ea)
-            if movk_ea is not None:
-                return movk_ea
-            break
+            has_seen_call = True
+
+        if has_seen_call:
+            call_ea = find_call_from_ea(cfunc, citem.ea)
+            if call_ea is not None:
+                movk_ea = get_previous_movk(call_ea)
+                if movk_ea is not None:
+                    return movk_ea
+                break
         citem = cfunc_body.find_parent_of(citem)
     return None
 
@@ -1053,7 +1085,7 @@ def get_previous_movk(call_ea: int) -> int | None:
     if not insn:
         return None
 
-    if insn.get_canon_mnem() != "BLR":
+    if insn.get_canon_mnem() not in ("BLR", "BR"):
         return None
 
     # Get the register for PAC code
