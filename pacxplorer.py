@@ -1031,7 +1031,6 @@ def find_call_from_ea(cfunc, item_ea):
         item_ea = next_ea
         insn = idautils.DecodeInstruction(item_ea)
     if insn is None:
-        print(f"Got none for ea {item_ea=}")
         return None
     return item_ea
 
