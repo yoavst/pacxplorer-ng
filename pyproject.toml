@@ -1,7 +1,6 @@
 [project]
 name = "pacxplorer-ng"
-#dynamic = ['version']
-version = "0.1.0"
+dynamic = ['version']
 description = "IDA Plugin that adds XREFs between virtual functions and their call sites"
 authors = [
     { name = "Yoav Sternberg", email = "yoav.sternberg@gmail.com" },
