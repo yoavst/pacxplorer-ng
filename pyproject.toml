@@ -1,0 +1,100 @@
+[project]
+name = "pacxplorer-ng"
+#dynamic = ['version']
+version = "0.1.0"
+description = "IDA Plugin that adds XREFs between virtual functions and their call sites"
+authors = [
+    { name = "Yoav Sternberg", email = "yoav.sternberg@gmail.com" },
+]
+readme = "README.md"
+repository = "https://github.com/yoavst/pacxplorer-ng"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+
+requires-python = ">=3.10"
+dependencies = [
+    "capstone==6.0.0a5",
+    "ida-netnode>=3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yoavst/pacxplorer-ng"
+Issues = "https://github.com/yoavst/pacxplorer-ng/issues"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "only-version"
+local_scheme = "no-local-version"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pacxplorerng"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.2",
+    "vermin>=1.6.0",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+fix = true
+
+[tool.ruff.lint]
+select = [
+    # flake8-2020
+    "YTT",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-builtins
+    "A",
+    # flake8-comprehensions
+    "C4",
+    # flake8-debugger
+    "T10",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # mccabe
+    "C90",
+    # pycodestyle
+    "E",
+    "W",
+    # pyflakes
+    "F",
+    # pygrep-hooks
+    "PGH",
+    # pyupgrade
+    "UP",
+    # ruff
+    "RUF",
+    # tryceratops
+    "TRY",
+]
+ignore = [
+    # LineTooLong
+    "E501",
+    # DoNotAssignLambda
+    "E731",
+    # Asserts
+    "S101",
+    # Name for classes
+    "N801",
+    # Custom error classes
+    "TRY003"
+]
+
+[tool.ruff.format]
+preview = true

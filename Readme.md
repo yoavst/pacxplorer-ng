@@ -1,17 +1,18 @@
-# PacXplorer
+# PacXplorer-NG
 PacXplorer is an IDA plugin that adds XREFs between virtual functions and their call sites.  
 This is accomplished by leveraging PAC codes in ARM64e binaries.
+
 ## Installation
-1. install [ida-nentode](https://github.com/williballenthin/ida-netnode) somewhere IDA can import it
-2. clone the repository and symlink `~/.idapro/plugins/pacxplorer.py` to `pacxplorer.py` in the cloned repo
+1. Install this package using your IDA's python pip: `pip install pacxplorer-ng`
+2. copy `ida-plugin.json` and `ida_plugin_stub.py` to your IDA's plugins folder: `~/.idapro/plugins/pacxplorer-ng` .
+3. Restart IDA.
+
 ## Usage
 
 ### Preliminary Analysis
 1. open an IDB and make sure autoanalysis has finished  
-1.1. *KernelCache only:* make sure to run [ida_kernelcache(Cellebrite's fork)](https://github.com/cellebrite-srl/ida_kernelcache). This defines the `` `vtable for'`` symbols
-2. from the menu select `Edit -> Plugins -> PacXplorer -> Analyse IDB`  
-2.2. if asked, point PacXplorer to the original input binary file that created the IDB
-    * this will only happen if the original PAC codes are not present in the IDB and the input binary can't be located automatically
+1.1. *KernelCache only:* make sure to run [ida_kernelcache-ng](https://github.com/gilboz/ida_kernelcache_ng/). This defines the `` `vtable for'`` symbols
+2. from the menu select `Edit -> Plugins -> PacXplorer-NG -> Analyse IDB...`
 3. done!
 
 ### Continuous Use
@@ -31,7 +32,7 @@ This is accomplished by leveraging PAC codes in ARM64e binaries.
 2. press the hotkey or activate the menu entry
 3. a list of possible call sites will open
 
-![](pacxplorer.gif)
+![](res/pacxplorer.gif)
 
 ## Principals of Operation
 PAC codes sign pointers with a _key_ and a _context_.  
@@ -72,8 +73,11 @@ At runtime, a simple matching of these two mappings is performed.
 
 ## External usage
 If you want to query PAC Xrefs from your own plugin, you can use the following code:
-```py
+```python
 from netnode import Netnode
+import idaapi
+import json
+
 n = Netnode("$ pacxplorer_io")
 
 # From call site to virtual function 
@@ -81,7 +85,7 @@ n["input"] = 0x1234 # address of movk
 idaapi.load_and_run_plugin("pacxplorer", 5)
 r = n.get("output")
 if r is not None:
-    # List of dicts with keys: xref_to, vtable_addr, vtable_entry_addr, offset, pac
+    # List of dicts with keys: method_addr, vtable_addr, vtable_entry_addr, offset, pac
     res = json.loads(r)
 
 # From virtual function to call site
@@ -89,9 +93,10 @@ n["input"] = 0x1234 # address of virtual functions
 idaapi.load_and_run_plugin("pacxplorer", 6)
 r = n.get("output")
 if r is not None:
-    # Pairs of possible call site, and pac code.
+    # Possible call sites
     res = json.loads(r)
 ```
+
 
  ## Q&A
 **Q: Why are there several virtual methods in the XREFs window?**  
@@ -110,18 +115,20 @@ Using the combination of (offset, hash) I'm yet to observe any such false positi
 **Q: Why is the XREF from the `MOVK` instruction and not the `BLRAA` call?**  
 **A:** I've encountered instances of several virtual calls using the same BLRAA.  
 Think of a function that selects a command handler with a switch-case, and all the cases jump to the same exit node that performs the call.
-
-**Q: Great stuff, I want to work with you!**  
-**A:** Uhh, that's not really a question but thanks! [click here](https://www.cellebrite.com/en/about/careers/positions/?comeet_cat=israel&comeet_pos=0B.613&comeet_all=all&rd) (Remote talent welcome)
  
 ## Limitations
 1. Works only on ARM64e binaries that conform to [the ABI](https://github.com/apple/llvm-project/blob/apple/master/clang/docs/PointerAuthentication.rst#c-virtual-functions)
-2. Vtable symbols need to be present in the binary (`` `vtable for'``). In the case of the Kernel, [ida_kernelcache](https://github.com/cellebrite-srl/ida_kernelcache) needs to have been run. Note that the official version doesn't support recent Kernels, but Cellebrite's fork is up to date.  
-3. If the tagged pointers haven't been preserved in the IDB, the original binary is needed for the analysis stage (but not afterwards)
-4. Hexrays support WIP
+2. Vtable symbols need to be present in the binary (`` `vtable for'``). In the case of the Kernel, [ida_kernelcache-ng](https://github.com/gilboz/ida_kernelcache_ng/) needs to have been run.  
 
 ## Meta
+This is a fork of Cellebrite's fork. I've done the following changes:
+- Split the code into several files and added a build system.
+- Changed the installation method to python package and a stub.
+- Rewrite the engine to be based on Capstone (instead of IDA disassembler), which led to ~60% performance improvements.
+- Pseudocode support.
+- Remote invocation support.
+
+Original meta from Cellebrite:
 Authored by Ouri Lipner of Cellebrite Security Research Labs. \
 Currently maintained by Omer Porzecanski of Cellebrite Security Research Labs. \
 Developed and tested for IDA 7.5 - 7.7 on OS X, iOS 12.x - 15.4 beta
-

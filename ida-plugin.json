@@ -1,0 +1,14 @@
+{
+  "IDAMetadataDescriptorVersion": 1,
+  "plugin": {
+    "name": "PacXplorer-NG",
+    "description": "Find xrefs for vtable methods using PAC codes",
+    "entryPoint": "ida_plugin_stub.py",
+    "categories": [
+      "decompilation"
+    ],
+    "idaVersions": ">=9.0",
+    "version": "1.0.0",
+    "logoPath": "res/logo.png"
+  }
+}
