@@ -16,7 +16,7 @@ This is a fork of Cellebrite's [PacXplorer](https://github.com/cellebrite-labs/P
 - Features
     - Rewrite of the engine to use capstone - 60% improvement in performance.
     - Pseudocode support - now can use the plugin directly from C.
-    - Remote invocation support using netnode.
+    - Remote invocation support from other plugins.
 
 ## Installation
 
@@ -109,31 +109,31 @@ At runtime, a simple matching of these two mappings is performed.
 
 ## External usage
 
-If you want to query PAC Xrefs from your own plugin, you can use the following code:
+If you want to query PAC Xrefs from your own plugin, follow the following steps:
+
+1. Copy [`src/pacxplorerng/definisions.py`](src/pacxplorerng/definitions.py) to your project.
+2. Use the following code:
 
 ```python
-from netnode import Netnode
-import idaapi
-import json
+# Replace it with import of your definisions.py file
+from pacxplorerng.definitions import get_explorer_instance, VtablePacEntry, ExplorerProtocol
 
-n = Netnode("$ pacxplorer_io")
+# Use the global instance of the PAC XREFs explorer
+explorer: ExplorerProtocol = get_explorer_instance()
 
-# From call site to virtual function 
-n["input"] = 0x1234  # address of movk
-idaapi.load_and_run_plugin("pacxplorer", 5)
-r = n.get("output")
-if r is not None:
-    # List of dicts with keys: method_addr, vtable_addr, vtable_entry_addr, offset, pac
-    res = json.loads(r)
+# Analyze the project if not already done
+explorer.analyze(only_cached=False)
 
-# From virtual function to call site
-n["input"] = 0x1234  # address of virtual functions
-idaapi.load_and_run_plugin("pacxplorer", 6)
-r = n.get("output")
-if r is not None:
-    # Possible call sites
-    res = json.loads(r)
+# Get possible function for a movk instruction
+movk_address = 0x12345678
+xrefs: list[VtablePacEntry] = explorer.movk_to_functions(movk_address)
+
+# Get the PAC XREFs for a specific function
+func_address = 0x87654321
+possible_callsites: list[int] = explorer.function_to_movks(func_address)
 ```
+
+You can use [idahelper's pac](https://github.com/yoavst/idahelper/blob/main/src/idahelper/pac) for more utils.
 
 ## Q&A
 

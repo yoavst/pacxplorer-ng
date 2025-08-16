@@ -53,3 +53,17 @@ class ExplorerProtocol(Protocol):
 
     def function_to_movks(self, func_ea: int) -> list[int]:
         """Get the possible MOVK candidates for a given function."""
+
+    def is_pac_function(self, func_ea: int) -> bool:
+        """Check if the function at the given address is a PAC function."""
+
+    @staticmethod
+    def get_instance() -> "ExplorerProtocol":
+        """Get the singleton instance of the Explorer."""
+
+
+def get_explorer_instance() -> ExplorerProtocol:
+    """Get the singleton instance of the Explorer."""
+    from pacxplorerng.explorer import Explorer
+
+    return Explorer.get_instance()

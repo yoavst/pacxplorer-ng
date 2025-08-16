@@ -20,6 +20,8 @@ class AnalysisNotDoneError(Exception):
 
 
 class Explorer(ExplorerProtocol):
+    _INSTANCE: "Explorer" = None
+
     def __init__(self):
         self._cache = PickleNetNode(NETNODE_NAME)
         self._analysis_done = False
@@ -32,6 +34,13 @@ class Explorer(ExplorerProtocol):
         """Mapping of MOVK instruction addresses to their PAC codes. Helps in solving call site => function candidates."""
         self._movks_by_code: dict[PacTuple, list[int]] = {}
         """Mapping of PAC codes to their possible MOVK instruction addresses. Helps in solving function => candidates call sites."""
+
+    @staticmethod
+    def get_instance() -> "Explorer":
+        """Get the singleton instance of the Explorer."""
+        if Explorer._INSTANCE is None:
+            Explorer._INSTANCE = Explorer()
+        return Explorer._INSTANCE
 
     def analyze(self, only_cached: bool = False) -> None:
         analysis_done = self._cache.get(ANALYSIS_DONE_KEY, False)
@@ -101,7 +110,6 @@ class Explorer(ExplorerProtocol):
         print(f"[{PLUGIN_NAME}] Analysis completed.")
 
     def movk_to_functions(self, movk_ea: int) -> list[VtablePacEntry]:
-        """Given a MOVK instruction address, return the function entries that correspond to its PAC code."""
         if not self._analysis_done:
             raise AnalysisNotDoneError()
 
@@ -111,7 +119,6 @@ class Explorer(ExplorerProtocol):
         return self._funcs_by_code.get(pac_tuple, [])
 
     def function_to_movks(self, func_ea: int) -> list[int]:
-        """Given a function address, return the MOVK instruction addresses that correspond to its PAC code."""
         if not self._analysis_done:
             raise AnalysisNotDoneError()
 
@@ -121,7 +128,6 @@ class Explorer(ExplorerProtocol):
         return self._movks_by_code.get(pac_tuple, [])
 
     def is_pac_function(self, func_ea: int) -> bool:
-        """Check if the function at the given address is a PAC function."""
         return func_ea in self._code_by_func
 
     @property
