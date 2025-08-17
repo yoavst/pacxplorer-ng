@@ -1,12 +1,12 @@
 __all__ = ["PLUGIN_ENTRY", "PacxplorerNGPlugin"]
 
 from contextlib import suppress
+from typing import Union
 
 import ida_idaapi
 import idaapi
 from ida_idaapi import plugin_t
 from ida_kernwin import UI_Hooks
-from netnode import Netnode
 
 from .coordinator import Coordinator
 from .explorer import AnalysisNotDoneError, Explorer
@@ -25,8 +25,7 @@ class PacxplorerNGPlugin(plugin_t, UI_Hooks):
         self.explorer: Explorer = Explorer.get_instance()
         self.coordinator: Coordinator = Coordinator(self.explorer)
         self.actions: list[MenuBase] = []
-        self.jump_xref_action: MenuBase | None = None
-        self.input_output_netnode: Netnode | None = None
+        self.jump_xref_action: Union[MenuBase, None] = None
 
     def init(self):
         typename = idaapi.get_file_type_name().lower()

@@ -1,3 +1,5 @@
+from typing import Union
+
 import ida_hexrays
 import idaapi
 import idautils
@@ -45,7 +47,7 @@ class Coordinator:
     def _has_movk_xrefs(self, ea: int) -> bool:
         return bool(self.explorer.movk_to_functions(ea))
 
-    def _has_vtable_xrefs(self, ea: int) -> int | None:
+    def _has_vtable_xrefs(self, ea: int) -> Union[int, None]:
         if self.explorer.is_pac_function(ea):
             return ea
 
@@ -59,7 +61,7 @@ class Coordinator:
 
 
 # region IDA utilities
-def _get_movk_ea_from_current_decompile(widget) -> int | None:  # noqa: C901
+def _get_movk_ea_from_current_decompile(widget) -> Union[int, None]:  # noqa: C901
     vu = ida_hexrays.get_widget_vdui(widget)
     if vu is None:
         return None
@@ -99,7 +101,7 @@ def _get_movk_ea_from_current_decompile(widget) -> int | None:  # noqa: C901
     return None
 
 
-def _find_call_ea_from_ea(cfunc: cfuncptr_t, item_ea: int) -> int | None:
+def _find_call_ea_from_ea(cfunc: cfuncptr_t, item_ea: int) -> Union[int, None]:
     ea_map = cfunc.get_eamap()
     insn = idautils.DecodeInstruction(item_ea)
     while insn is not None and insn.get_canon_mnem() not in ("BLR", "BR"):
@@ -114,7 +116,7 @@ def _find_call_ea_from_ea(cfunc: cfuncptr_t, item_ea: int) -> int | None:
     return item_ea
 
 
-def _get_previous_movk(call_ea: int) -> int | None:
+def _get_previous_movk(call_ea: int) -> Union[int, None]:
     """Given a call, search previous instructions to find a movk call"""
     insn = idautils.DecodeInstruction(call_ea)
     if not insn:

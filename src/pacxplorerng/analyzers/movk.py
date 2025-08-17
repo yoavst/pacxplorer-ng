@@ -45,7 +45,7 @@ class FuncMovKAnalyzer:
                 movks.append(MovkCodeTuple(pac_tuple, addr))
         return movks
 
-    def _analyze_movk(self, movk_insn: capstone.CsInsn) -> PacTuple | None:  # noqa: C901
+    def _analyze_movk(self, movk_insn: capstone.CsInsn) -> Union[PacTuple, None]:  # noqa: C901
         # Given movk instruction of the form: MOVK X17, #0xCDA1,LSL#48
         movk_op1, movk_op2 = cast(list[capstone.aarch64.AArch64Op], movk_insn.operands)
 
@@ -125,7 +125,7 @@ class FuncMovKAnalyzer:
                     # TODO check it
                     return None
 
-    def _find_const_assignment_to_register(self, insn: capstone.CsInsn, reg: int) -> int | None:
+    def _find_const_assignment_to_register(self, insn: capstone.CsInsn, reg: int) -> Union[int, None]:
         """Find the instruction that assigns a constant value to the specified register."""
         for _ in range(MAX_INSNS_BACK_FOR_CONST_REGISTER):
             previous_insn_addr = self._get_previous_instruction(insn.address)
@@ -142,7 +142,7 @@ class FuncMovKAnalyzer:
         self._add_comment(insn.address, BAD_INDIRECT_REG_VAL)
         return None
 
-    def _get_previous_instruction(self, current_address: int) -> int | None:
+    def _get_previous_instruction(self, current_address: int) -> Union[int, None]:
         """Get the previous instruction before the current address."""
         return next(
             (x for x in idautils.CodeRefsTo(current_address, True) if x in self._func_insns and x != current_address),
