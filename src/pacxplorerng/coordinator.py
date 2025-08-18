@@ -23,10 +23,10 @@ class Coordinator:
         else:
             return
 
-        chosen = chooser.show()
-        if chosen is None:
+        ea = chooser.show()
+        if ea is None:
             return
-        idaapi.jumpto(int(chosen[0], 16))
+        idaapi.jumpto(ea)
 
     def can_jump_pac_xrefs(self, ctx) -> bool:
         """Check if we can jump to PAC xrefs based on the current context."""

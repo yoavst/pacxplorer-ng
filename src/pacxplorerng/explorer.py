@@ -85,7 +85,7 @@ class Explorer(ExplorerProtocol):
         for entry in vtable_entries:
             pac_tuple = PacTuple(entry.offset, entry.pac)
             funcs_by_code.setdefault(pac_tuple, []).append(entry)
-            code_by_func[entry.method_addr] = pac_tuple
+            code_by_func[entry.xref_to] = pac_tuple
 
         self._funcs_by_code = funcs_by_code
         self._code_by_func = code_by_func

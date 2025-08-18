@@ -1,6 +1,6 @@
 __all__ = ["FuncXrefChooser", "MovkXrefChooser"]
 
-from typing import Generic, NamedTuple, TypeVar
+from typing import Generic, NamedTuple, Protocol, TypeVar, Union
 
 import idaapi
 import idc
@@ -8,7 +8,13 @@ from ida_kernwin import Choose, action_handler_t
 
 from pacxplorerng.definitions import VtablePacEntry
 
-T = TypeVar("T", bound=tuple)
+
+class Addressable(Protocol):
+    def ea(self) -> int:
+        """Return the effective address of the item."""
+
+
+T = TypeVar("T", bound=Addressable)
 
 
 class SimpleChoose(Choose, Generic[T]):
@@ -48,17 +54,20 @@ class SimpleChoose(Choose, Generic[T]):
     def OnGetLine(self, n):
         return self.items[n]
 
-    def show(self):
+    def show(self) -> Union[int, None]:
         selected = self.Show(modal=True)
         if selected < 0:
             return None
-        return self.items[selected]
+        return self.items[selected].ea()
 
 
 class MovkXrefItem(NamedTuple):
     address: str
     method: str
     clazz: str
+
+    def ea(self) -> int:
+        return int(self.address, 16)
 
 
 class MovkXrefChooser(SimpleChoose[MovkXrefItem]):
@@ -118,8 +127,8 @@ class MovkXrefChooser(SimpleChoose[MovkXrefItem]):
             print(hex(entry.vtable_addr), _demangle(entry.vtable_addr))
             items.append(
                 MovkXrefItem(
-                    address=f"0x{entry.method_addr:016X}",
-                    method=_demangle(entry.method_addr),
+                    address=f"0x{entry.xref_to:016X}",
+                    method=_demangle(entry.xref_to),
                     clazz=_demangle(entry.vtable_addr),
                 )
             )
@@ -127,8 +136,11 @@ class MovkXrefChooser(SimpleChoose[MovkXrefItem]):
 
 
 class FuncXrefItem(NamedTuple):
-    address: str
     address_textual: str
+    address: str
+
+    def ea(self) -> int:
+        return int(self.address, 16)
 
 
 class FuncXrefChooser(SimpleChoose[FuncXrefItem]):
@@ -137,8 +149,8 @@ class FuncXrefChooser(SimpleChoose[FuncXrefItem]):
             f"PAC xrefs to: 0x{func_ea:016X}",
             self._create_items(eas),
             [
-                ["Address (hex)", 15 | Choose.CHCOL_HEX],
                 ["Address", 30 | Choose.CHCOL_PLAIN],
+                ["Address (hex)", 15 | Choose.CHCOL_EA],
             ],
         )
 

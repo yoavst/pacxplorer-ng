@@ -32,7 +32,7 @@ class MovkCodeTuple(NamedTuple):
 class VtablePacEntry(NamedTuple):
     """This tuple represents a vtable entry with its PAC information."""
 
-    method_addr: int
+    xref_to: int
     vtable_addr: int
     vtable_entry_addr: int
     offset: int
