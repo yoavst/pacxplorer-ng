@@ -14,7 +14,7 @@ from .gui.actions import AnalyzeMenu, JumpXrefMenu, MenuBase
 
 
 class PacxplorerNGPlugin(plugin_t, UI_Hooks):
-    flags = ida_idaapi.PLUGIN_MOD | ida_idaapi.PLUGIN_HIDE
+    flags = int(ida_idaapi.PLUGIN_MOD) | int(ida_idaapi.PLUGIN_HIDE)
     comment = "find xrefs for vtable methods using PAC codes"
     help = ""
     wanted_name = "PacXplorer-NG"
